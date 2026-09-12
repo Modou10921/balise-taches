@@ -5,7 +5,7 @@ import '../models/task.dart';
 class ApiService {
   // Sur Chrome/web : localhost fonctionne.
   // Sur un émulateur Android : remplacez par 10.0.2.2
-  static const String baseUrl = 'http://localhost:3000';
+  static const String baseUrl = 'https://glorious-space-fiesta-gxv7v4xrw54h9j4p-3000.app.github.dev';
 
   static Future<List<Task>> getTasks() async {
     final response = await http.get(Uri.parse('$baseUrl/task'));

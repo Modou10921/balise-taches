@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../models/task.dart';
 import '../services/api_service.dart';
+import '../services/cache_service.dart';
 import 'task_detail_screen.dart';
 import 'add_edit_task_screen.dart';
 import 'profile_screen.dart';
@@ -16,6 +17,7 @@ class TaskListScreen extends StatefulWidget {
 class _TaskListScreenState extends State<TaskListScreen> {
   List<Task> _tasks = [];
   bool _isLoading = true;
+  bool _isOffline = false;
   String? _error;
 
   String _searchQuery = '';
@@ -32,16 +34,27 @@ class _TaskListScreenState extends State<TaskListScreen> {
       _isLoading = true;
       _error = null;
     });
+
     try {
+      // 1. On essaie d'abord l'API
       final tasks = await ApiService.getTasks();
+      // 2. Succès : on met à jour le cache local avec les données fraîches
+      await CacheService.saveTasks(tasks);
       setState(() {
         _tasks = tasks;
         _isLoading = false;
+        _isOffline = false;
       });
     } catch (e) {
+      // 3. Échec (pas de connexion) : on lit le cache local à la place
+      final cached = await CacheService.getTasks();
       setState(() {
-        _error = "Impossible de charger les tâches.\nVérifiez que le serveur (task_apis) est démarré.";
+        _tasks = cached;
         _isLoading = false;
+        _isOffline = true;
+        _error = cached.isEmpty
+            ? "Impossible de charger les tâches.\nVérifiez que le serveur (task_apis) est démarré."
+            : null;
       });
     }
   }
@@ -89,7 +102,9 @@ class _TaskListScreenState extends State<TaskListScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 14),
+              if (_isOffline && _tasks.isNotEmpty) _buildOfflineBanner(),
+              const SizedBox(height: 8),
               TextField(
                 decoration: const InputDecoration(
                   hintText: 'Rechercher une tâche...',
@@ -120,9 +135,37 @@ class _TaskListScreenState extends State<TaskListScreen> {
           await Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const AddEditTaskScreen()),
           );
-          _loadTasks(); // on recharge depuis l'API après un ajout
+          _loadTasks();
         },
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  Widget _buildOfflineBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.med.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.med.withOpacity(0.4)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.wifi_off, size: 14, color: AppColors.med),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Mode hors ligne — dernières tâches connues',
+              style: TextStyle(color: AppColors.med, fontSize: 11.5),
+            ),
+          ),
+          GestureDetector(
+            onTap: _loadTasks,
+            child: const Text('Réessayer', style: TextStyle(color: AppColors.med, fontSize: 11.5, decoration: TextDecoration.underline)),
+          ),
+        ],
       ),
     );
   }
@@ -176,7 +219,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
         await Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => TaskDetailScreen(task: task)),
         );
-        _loadTasks(); // on recharge après retour (modif ou suppression éventuelle)
+        _loadTasks();
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
