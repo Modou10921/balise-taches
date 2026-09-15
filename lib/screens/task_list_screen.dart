@@ -3,6 +3,7 @@ import '../theme.dart';
 import '../models/task.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
+import '../services/auth_service.dart';
 import 'task_detail_screen.dart';
 import 'add_edit_task_screen.dart';
 import 'profile_screen.dart';
@@ -19,6 +20,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
   bool _isLoading = true;
   bool _isOffline = false;
   String? _error;
+  String _userName = '';
 
   String _searchQuery = '';
   String? _activeFilter;
@@ -27,6 +29,16 @@ class _TaskListScreenState extends State<TaskListScreen> {
   void initState() {
     super.initState();
     _loadTasks();
+    _loadUserName();
+  }
+
+  Future<void> _loadUserName() async {
+    try {
+      final profile = await AuthService.getProfile();
+      setState(() => _userName = profile['prenom'] ?? '');
+    } catch (e) {
+      setState(() => _userName = '');
+    }
   }
 
   Future<void> _loadTasks() async {
@@ -36,9 +48,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
     });
 
     try {
-      // 1. On essaie d'abord l'API
       final tasks = await ApiService.getTasks();
-      // 2. Succès : on met à jour le cache local avec les données fraîches
       await CacheService.saveTasks(tasks);
       setState(() {
         _tasks = tasks;
@@ -46,7 +56,6 @@ class _TaskListScreenState extends State<TaskListScreen> {
         _isOffline = false;
       });
     } catch (e) {
-      // 3. Échec (pas de connexion) : on lit le cache local à la place
       final cached = await CacheService.getTasks();
       setState(() {
         _tasks = cached;
@@ -81,11 +90,11 @@ class _TaskListScreenState extends State<TaskListScreen> {
                 children: [
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text('BONJOUR, AMINATA',
-                          style: TextStyle(color: AppColors.accent, fontSize: 11, letterSpacing: 1)),
-                      SizedBox(height: 4),
-                      Text('Vos tâches',
+                    children: [
+                      Text('BONJOUR, ${_userName.toUpperCase()}',
+                          style: const TextStyle(color: AppColors.accent, fontSize: 11, letterSpacing: 1)),
+                      const SizedBox(height: 4),
+                      const Text('Vos tâches',
                           style: TextStyle(color: AppColors.text, fontSize: 22, fontWeight: FontWeight.w700)),
                     ],
                   ),
@@ -95,9 +104,12 @@ class _TaskListScreenState extends State<TaskListScreen> {
                         MaterialPageRoute(builder: (_) => const ProfileScreen()),
                       );
                     },
-                    child: const CircleAvatar(
+                    child: CircleAvatar(
                       backgroundColor: AppColors.surface2,
-                      child: Text('AD', style: TextStyle(color: AppColors.text, fontSize: 13)),
+                      child: Text(
+                        _userName.isNotEmpty ? _userName[0].toUpperCase() : '?',
+                        style: const TextStyle(color: AppColors.text, fontSize: 13),
+                      ),
                     ),
                   ),
                 ],

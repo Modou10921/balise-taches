@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
+import '../services/auth_service.dart';
 import 'login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -10,36 +11,78 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  late TextEditingController _nameController;
-  late TextEditingController _phoneController;
-  late TextEditingController _emailController;
+  final _nomController = TextEditingController();
+  final _prenomController = TextEditingController();
+  final _emailController = TextEditingController();
+  bool _isLoading = true;
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    // Données statiques pour l'instant — remplacées par l'API au Livrable 4
-    _nameController = TextEditingController(text: 'Aminata Diop');
-    _phoneController = TextEditingController(text: '+221 77 000 00 00');
-    _emailController = TextEditingController(text: 'aminata@exemple.com');
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final profile = await AuthService.getProfile();
+      _nomController.text = profile['nom'] ?? '';
+      _prenomController.text = profile['prenom'] ?? '';
+      _emailController.text = profile['email'] ?? '';
+    } catch (e) {
+      // silencieux : si ça échoue, les champs restent vides
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _saveProfile() async {
+    setState(() => _isSaving = true);
+    try {
+      await AuthService.updateProfile({
+        'nom': _nomController.text.trim(),
+        'prenom': _prenomController.text.trim(),
+        'email': _emailController.text.trim(),
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profil mis à jour')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erreur lors de la mise à jour')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _logout() async {
+    await AuthService.logout();
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    }
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _phoneController.dispose();
+    _nomController.dispose();
+    _prenomController.dispose();
     _emailController.dispose();
     super.dispose();
   }
 
-  void _logout() {
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-      (route) => false, // vide toute la pile de navigation
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator(color: AppColors.accent)));
+    }
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -49,102 +92,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
             children: [
               GestureDetector(
                 onTap: () => Navigator.of(context).pop(),
-                child: const Row(
-                  children: [
-                    Icon(Icons.arrow_back, color: AppColors.muted, size: 18),
-                    SizedBox(width: 8),
-                    Text('Retour', style: TextStyle(color: AppColors.muted, fontSize: 13)),
-                  ],
-                ),
+                child: const Row(children: [
+                  Icon(Icons.arrow_back, color: AppColors.muted, size: 18),
+                  SizedBox(width: 8),
+                  Text('Retour', style: TextStyle(color: AppColors.muted, fontSize: 13)),
+                ]),
               ),
               const SizedBox(height: 24),
-
-              // Photo de profil
               Center(
-                child: Column(
-                  children: [
-                    Stack(
-                      children: [
-                        Container(
-                          width: 84,
-                          height: 84,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: AppColors.surface2,
-                            border: Border.all(color: AppColors.accent, width: 2),
-                          ),
-                          child: const Center(
-                            child: Text('AD',
-                                style: TextStyle(
-                                    color: AppColors.text,
-                                    fontSize: 26,
-                                    fontWeight: FontWeight.w600)),
-                          ),
-                        ),
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: GestureDetector(
-                            onTap: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text('Sélection de photo — à venir')),
-                              );
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: AppColors.accent,
-                              ),
-                              child: const Icon(Icons.camera_alt,
-                                  size: 14, color: AppColors.ink),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    const Text('Modifier la photo',
-                        style: TextStyle(color: AppColors.text, fontSize: 13)),
-                  ],
-                ),
+                child: Column(children: const [
+                  CircleAvatar(radius: 42, backgroundColor: AppColors.surface2, child: Icon(Icons.person, color: AppColors.text, size: 36)),
+                ]),
               ),
               const SizedBox(height: 28),
-
-              const Text('NOM COMPLET', style: TextStyle(color: AppColors.muted, fontSize: 11)),
+              const Text('NOM', style: TextStyle(color: AppColors.muted, fontSize: 11)),
               const SizedBox(height: 6),
-              TextField(controller: _nameController),
+              TextField(controller: _nomController),
               const SizedBox(height: 16),
-
-              const Text('TÉLÉPHONE', style: TextStyle(color: AppColors.muted, fontSize: 11)),
+              const Text('PRÉNOM', style: TextStyle(color: AppColors.muted, fontSize: 11)),
               const SizedBox(height: 6),
-              TextField(controller: _phoneController),
+              TextField(controller: _prenomController),
               const SizedBox(height: 16),
-
               const Text('EMAIL', style: TextStyle(color: AppColors.muted, fontSize: 11)),
               const SizedBox(height: 6),
               TextField(controller: _emailController),
               const SizedBox(height: 24),
-
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Profil mis à jour')),
-                    );
-                  },
-                  child: const Text('Enregistrer les modifications'),
+                  onPressed: _isSaving ? null : _saveProfile,
+                  child: _isSaving
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.ink))
+                      : const Text('Enregistrer les modifications'),
                 ),
               ),
               const SizedBox(height: 20),
-
               Center(
                 child: GestureDetector(
                   onTap: _logout,
-                  child: const Text('⎋ Se déconnecter',
-                      style: TextStyle(color: AppColors.high, fontSize: 13)),
+                  child: const Text('⎋ Se déconnecter', style: TextStyle(color: AppColors.high, fontSize: 13)),
                 ),
               ),
             ],

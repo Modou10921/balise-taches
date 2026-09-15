@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
+import '../services/auth_service.dart';
 import 'login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -10,23 +11,26 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final _nameController = TextEditingController();
-  final _phoneController = TextEditingController();
+  final _nomController = TextEditingController();
+  final _prenomController = TextEditingController();
   final _emailController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _phoneController.dispose();
+    _nomController.dispose();
+    _prenomController.dispose();
     _emailController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  void _register() {
-    if (_nameController.text.trim().isEmpty ||
-        _emailController.text.trim().isEmpty ||
+  Future<void> _register() async {
+    if (_nomController.text.trim().isEmpty ||
+        _usernameController.text.trim().isEmpty ||
         _passwordController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Merci de remplir tous les champs obligatoires')),
@@ -34,11 +38,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    // Pour l'instant : simulation. L'inscription réelle sera branchée sur
-    // l'API au Livrable 4 (Authentification).
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-    );
+    setState(() => _isLoading = true);
+    try {
+      await AuthService.register(
+        nom: _nomController.text.trim(),
+        prenom: _prenomController.text.trim(),
+        email: _emailController.text.trim(),
+        username: _usernameController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+        );
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Erreur lors de l'inscription")),
+        );
+      }
+    }
   }
 
   @override
@@ -53,66 +74,47 @@ class _RegisterScreenState extends State<RegisterScreen> {
               children: [
                 GestureDetector(
                   onTap: () => Navigator.of(context).pop(),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.arrow_back, color: AppColors.muted, size: 18),
-                      SizedBox(width: 8),
-                      Text('Retour', style: TextStyle(color: AppColors.muted, fontSize: 13)),
-                    ],
-                  ),
+                  child: const Row(children: [
+                    Icon(Icons.arrow_back, color: AppColors.muted, size: 18),
+                    SizedBox(width: 8),
+                    Text('Retour', style: TextStyle(color: AppColors.muted, fontSize: 13)),
+                  ]),
                 ),
                 const SizedBox(height: 20),
-
                 Text('Inscription', style: Theme.of(context).textTheme.headlineSmall),
                 const SizedBox(height: 6),
-                const Text('Créez votre compte en 30 secondes.',
-                    style: TextStyle(color: AppColors.muted, fontSize: 13)),
+                const Text('Créez votre compte en 30 secondes.', style: TextStyle(color: AppColors.muted, fontSize: 13)),
                 const SizedBox(height: 28),
-
-                const Text('NOM COMPLET', style: TextStyle(color: AppColors.muted, fontSize: 11)),
+                const Text('NOM', style: TextStyle(color: AppColors.muted, fontSize: 11)),
                 const SizedBox(height: 6),
-                TextField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(hintText: 'Aminata Diop'),
-                ),
+                TextField(controller: _nomController, decoration: const InputDecoration(hintText: 'Diop')),
                 const SizedBox(height: 16),
-
-                const Text('TÉLÉPHONE', style: TextStyle(color: AppColors.muted, fontSize: 11)),
+                const Text('PRÉNOM', style: TextStyle(color: AppColors.muted, fontSize: 11)),
                 const SizedBox(height: 6),
-                TextField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(hintText: '+221 77 000 00 00'),
-                ),
+                TextField(controller: _prenomController, decoration: const InputDecoration(hintText: 'Aminata')),
                 const SizedBox(height: 16),
-
                 const Text('EMAIL', style: TextStyle(color: AppColors.muted, fontSize: 11)),
                 const SizedBox(height: 6),
-                TextField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(hintText: 'vous@exemple.com'),
-                ),
+                TextField(controller: _emailController, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(hintText: 'vous@exemple.com')),
                 const SizedBox(height: 16),
-
+                const Text("NOM D'UTILISATEUR", style: TextStyle(color: AppColors.muted, fontSize: 11)),
+                const SizedBox(height: 6),
+                TextField(controller: _usernameController, decoration: const InputDecoration(hintText: 'aminata')),
+                const SizedBox(height: 16),
                 const Text('MOT DE PASSE', style: TextStyle(color: AppColors.muted, fontSize: 11)),
                 const SizedBox(height: 6),
-                TextField(
-                  controller: _passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(hintText: '••••••••'),
-                ),
+                TextField(controller: _passwordController, obscureText: true, decoration: const InputDecoration(hintText: '••••••••')),
                 const SizedBox(height: 24),
-
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: _register,
-                    child: const Text("S'inscrire"),
+                    onPressed: _isLoading ? null : _register,
+                    child: _isLoading
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.ink))
+                        : const Text("S'inscrire"),
                   ),
                 ),
                 const SizedBox(height: 16),
-
                 Center(
                   child: GestureDetector(
                     onTap: () => Navigator.of(context).pop(),
@@ -121,12 +123,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         style: TextStyle(color: AppColors.muted, fontSize: 13),
                         children: [
                           TextSpan(text: "Déjà inscrit ? "),
-                          TextSpan(
-                            text: "Se connecter",
-                            style: TextStyle(
-                                color: AppColors.accent,
-                                decoration: TextDecoration.underline),
-                          ),
+                          TextSpan(text: "Se connecter", style: TextStyle(color: AppColors.accent, decoration: TextDecoration.underline)),
                         ],
                       ),
                     ),

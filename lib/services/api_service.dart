@@ -1,14 +1,22 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/task.dart';
+import 'auth_service.dart';
 
 class ApiService {
-  // Sur Chrome/web : localhost fonctionne.
-  // Sur un émulateur Android : remplacez par 10.0.2.2
   static const String baseUrl = 'https://glorious-space-fiesta-gxv7v4xrw54h9j4p-3000.app.github.dev';
 
+  static Future<Map<String, String>> _authHeaders() async {
+    final token = await AuthService.getToken();
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
+  }
+
   static Future<List<Task>> getTasks() async {
-    final response = await http.get(Uri.parse('$baseUrl/task'));
+    final headers = await _authHeaders();
+    final response = await http.get(Uri.parse('$baseUrl/task'), headers: headers);
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
       return data.map((json) => Task.fromJson(json)).toList();
@@ -17,9 +25,10 @@ class ApiService {
   }
 
   static Future<Task> createTask(Task task) async {
+    final headers = await _authHeaders();
     final response = await http.post(
       Uri.parse('$baseUrl/task'),
-      headers: {'Content-Type': 'application/json'},
+      headers: headers,
       body: jsonEncode(task.toJson()),
     );
     if (response.statusCode == 201) {
@@ -29,9 +38,10 @@ class ApiService {
   }
 
   static Future<Task> updateTask(int id, Task task) async {
+    final headers = await _authHeaders();
     final response = await http.patch(
       Uri.parse('$baseUrl/task/$id'),
-      headers: {'Content-Type': 'application/json'},
+      headers: headers,
       body: jsonEncode(task.toJson()),
     );
     if (response.statusCode == 200) {
@@ -41,7 +51,8 @@ class ApiService {
   }
 
   static Future<void> deleteTask(int id) async {
-    final response = await http.delete(Uri.parse('$baseUrl/task/$id'));
+    final headers = await _authHeaders();
+    final response = await http.delete(Uri.parse('$baseUrl/task/$id'), headers: headers);
     if (response.statusCode != 200 && response.statusCode != 204) {
       throw Exception('Erreur lors de la suppression de la tâche');
     }
